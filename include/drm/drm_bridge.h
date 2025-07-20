@@ -334,6 +334,10 @@ struct drm_bridge_funcs {
 	 */
 	void (*atomic_post_disable)(struct drm_bridge *bridge,
 				    struct drm_atomic_state *state);
+
+	void (*disp_param_set)(struct drm_bridge *bridge, int cmd);
+
+	int (*disp_get_panel_info)(struct drm_bridge *bridge, char *name);
 };
 
 /**
@@ -399,6 +403,8 @@ struct drm_bridge {
 	const struct drm_bridge_funcs *funcs;
 	/** @driver_private: pointer to the bridge driver's internal context */
 	void *driver_private;
+	struct mutex lock;
+	bool is_dsi_drm_bridge;
 };
 
 void drm_bridge_add(struct drm_bridge *bridge);
@@ -419,6 +425,7 @@ void drm_bridge_mode_set(struct drm_bridge *bridge,
 			 struct drm_display_mode *adjusted_mode);
 void drm_bridge_pre_enable(struct drm_bridge *bridge);
 void drm_bridge_enable(struct drm_bridge *bridge);
+int dsi_bridge_interface_enable(int timeout);
 
 void drm_atomic_bridge_disable(struct drm_bridge *bridge,
 			       struct drm_atomic_state *state);

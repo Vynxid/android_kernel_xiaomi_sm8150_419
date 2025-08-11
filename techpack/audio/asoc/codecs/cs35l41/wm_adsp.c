@@ -4085,13 +4085,13 @@ int wm_adsp2_component_probe(struct wm_adsp *dsp, struct snd_soc_component *comp
 }
 EXPORT_SYMBOL_GPL(wm_adsp2_component_probe);
 
-int wm_adsp2_codec_remove(struct wm_adsp *dsp, struct snd_soc_component *component)
+int wm_adsp2_component_remove(struct wm_adsp *dsp, struct snd_soc_component *component)
 {
 	wm_adsp2_cleanup_debugfs(dsp);
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(wm_adsp2_codec_remove);
+EXPORT_SYMBOL_GPL(wm_adsp2_component_remove);
 
 int wm_adsp2_init(struct wm_adsp *dsp)
 {

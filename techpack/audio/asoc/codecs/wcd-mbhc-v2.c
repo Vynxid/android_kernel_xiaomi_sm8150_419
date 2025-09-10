@@ -604,7 +604,7 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			 jack_type, mbhc->hph_status);
 #if defined(CONFIG_MACH_XIAOMI_VAYU) || defined(CONFIG_MACH_XIAOMI_NABU)
 		if (mbhc->mbhc_cb->mbhc_mute_hs_tx && jack_type == SND_JACK_HEADSET)
-			mbhc->mbhc_cb->mbhc_mute_hs_tx(codec);
+			mbhc->mbhc_cb->mbhc_mute_hs_tx(component);
 #endif
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				mbhc->hph_status, WCD_MBHC_JACK_MASK);
@@ -865,7 +865,7 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 0);
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
 #ifdef CONFIG_MACH_XIAOMI_SM8150
-			mbhc->mbhc_cb->mbhc_micbias_control(mbhc->codec,
+			mbhc->mbhc_cb->mbhc_micbias_control(mbhc->component,
 							MIC_BIAS_2, MICB_PULLUP_DISABLE);
 #endif
 			/* Setup for insertion detection */
@@ -1009,7 +1009,7 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 0);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
 #ifdef CONFIG_MACH_XIAOMI_SM8150
-		mbhc->mbhc_cb->mbhc_micbias_control(mbhc->codec,
+		mbhc->mbhc_cb->mbhc_micbias_control(mbhc->component,
 						MIC_BIAS_2, MICB_PULLUP_DISABLE);
 #endif
 		if (mbhc->mbhc_cb->mbhc_common_micb_ctrl)
@@ -1077,7 +1077,9 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 					mbhc->mbhc_cb->clk_setup(
 						mbhc->component, false);
 			}
+#ifndef CONFIG_MACH_XIAOMI_SM8150
 		}
+#endif
 
 		if (mbhc->mbhc_cfg->moisture_en ||
 		    mbhc->mbhc_cfg->moisture_duty_cycle_en) {
@@ -1718,7 +1720,7 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 		mbhc->usbc_mode = POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER;
 #ifdef CONFIG_MACH_XIAOMI_SM8150
 		if (mbhc->mbhc_cb->clk_setup)
-			mbhc->mbhc_cb->clk_setup(mbhc->codec, true);
+			mbhc->mbhc_cb->clk_setup(mbhc->component, true);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_L_DET_EN, 1);
 #endif
 	} else {
@@ -1753,7 +1755,7 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 #ifdef CONFIG_MACH_XIAOMI_SM8150
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MIC_CLAMP_CTL, 0);
 		if (mbhc->mbhc_cfg->swap_gnd_mic)
-			mbhc->mbhc_cfg->swap_gnd_mic(mbhc->codec, false);
+			mbhc->mbhc_cfg->swap_gnd_mic(mbhc->component, false);
 #endif
 		if (mbhc->mbhc_cfg->swap_gnd_mic)
 			mbhc->mbhc_cfg->swap_gnd_mic(component, false);
@@ -1918,7 +1920,7 @@ static int wcd_mbhc_non_usb_c_event_changed(struct notifier_block *nb,
 
 	switch (mode.intval) {
 	case POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER:
-		dev_err(mbhc->codec->dev, "%s: report Type-C usb headphone\n", __func__);
+		dev_err(mbhc->component->dev, "%s: report Type-C usb headphone\n", __func__);
 		if (mbhc->usbc_mode == mode.intval)
 			break; /* filter notifications received before */
 		wcd_mbhc_jack_report(mbhc, &mbhc->usb_3_5_jack,
@@ -1995,8 +1997,8 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 
 			mbhc_cfg->usbc_analog_legacy = true;
 			/* goto err; */
-#endif
 		}
+#endif
 	}
 
 #ifdef CONFIG_MACH_XIAOMI_SM8150
@@ -2011,7 +2013,7 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 			}
 		}
 
-		if (mbhc_cfg->use_fsa4476_gpio != 0) {
+	if (mbhc_cfg->use_fsa4476_gpio != 0) {
 #else
 	if (mbhc_cfg->enable_usbc_analog && mbhc_cfg->usbc_analog_legacy) {
 		struct usbc_ana_audio_config *config =

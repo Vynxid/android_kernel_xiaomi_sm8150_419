@@ -31774,7 +31774,7 @@ static int msm_routing_probe(struct snd_soc_component *component)
 			port_multi_channel_map_mixer_controls,
 			ARRAY_SIZE(port_multi_channel_map_mixer_controls));
 #ifdef CONFIG_MACH_XIAOMI_SM8150
-	elliptic_add_platform_controls(platform);
+	elliptic_add_component_controls(component);
 #endif
 	/* for mius start */
 #ifdef CONFIG_US_PROXIMITY

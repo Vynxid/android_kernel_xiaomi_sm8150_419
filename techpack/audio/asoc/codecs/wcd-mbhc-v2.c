@@ -1064,12 +1064,8 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 #endif
 		wcd_mbhc_report_plug(mbhc, 0, jack_type);
 
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		if (mbhc->mbhc_cfg->enable_usbc_analog) {
-#else
 		if (mbhc->mbhc_cfg->enable_usbc_analog) {
 			if (mbhc->mbhc_cfg->usbc_analog_legacy) {
-#endif
 				WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_L_DET_EN, 1);
 			} else {
 				WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_L_DET_EN, 0);
@@ -1077,9 +1073,7 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 					mbhc->mbhc_cb->clk_setup(
 						mbhc->component, false);
 			}
-#ifndef CONFIG_MACH_XIAOMI_SM8150
 		}
-#endif
 
 		if (mbhc->mbhc_cfg->moisture_en ||
 		    mbhc->mbhc_cfg->moisture_duty_cycle_en) {
@@ -1435,15 +1429,10 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 	 * by an external source
 	 */
 	if (mbhc->mbhc_cfg->enable_usbc_analog) {
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		mbhc->hphl_swh = 0;
-		mbhc->gnd_swh = 0;
-#else
 		if (mbhc->mbhc_cfg->usbc_analog_legacy) {
 			mbhc->hphl_swh = 1;
 			mbhc->gnd_swh = 1;
 		}
-#endif
 
 		if (mbhc->mbhc_cb->hph_pull_up_control_v2)
 			mbhc->mbhc_cb->hph_pull_up_control_v2(component,
@@ -1467,11 +1456,7 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 	 * when a non-audio accessory is inserted. L_DET_EN sets to 1 when FSA
 	 * I2C driver notifies that ANALOG_AUDIO_ADAPTER is inserted
 	 */
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-	if (mbhc->mbhc_cfg->enable_usbc_analog)
-#else
 	if (mbhc->mbhc_cfg->enable_usbc_analog && !mbhc->mbhc_cfg->usbc_analog_legacy)
-#endif
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_L_DET_EN, 0);
 	else
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_L_DET_EN, 1);
@@ -1495,12 +1480,8 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 	mbhc->mbhc_cb->mbhc_bias(component, true);
 	/* enable MBHC clock */
 	if (mbhc->mbhc_cb->clk_setup) {
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		if (mbhc->mbhc_cfg->enable_usbc_analog)
-#else
 		if (mbhc->mbhc_cfg->enable_usbc_analog &&
 		    !mbhc->mbhc_cfg->usbc_analog_legacy)
-#endif
 			mbhc->mbhc_cb->clk_setup(component, false);
 		else
 			mbhc->mbhc_cb->clk_setup(component, true);
@@ -1774,51 +1755,6 @@ static void wcd_mbhc_usbc_analog_work_fn(struct work_struct *work)
 			mbhc->usbc_mode != POWER_SUPPLY_TYPEC_NONE);
 }
 
-/* this callback function is used to process PMI notification */
-static int wcd_mbhc_usb_c_event_changed(struct notifier_block *nb,
-					unsigned long evt, void *ptr)
-{
-	int ret;
-	union power_supply_propval mode;
-	struct wcd_mbhc *mbhc = container_of(nb, struct wcd_mbhc, psy_nb);
-	struct snd_soc_component *component = mbhc->component;
-
-	if (ptr != mbhc->usb_psy || evt != PSY_EVENT_PROP_CHANGED)
-		return 0;
-
-	ret = power_supply_get_property(mbhc->usb_psy,
-			POWER_SUPPLY_PROP_TYPEC_MODE, &mode);
-	if (ret) {
-		dev_err(component->dev, "%s: Unable to read USB TYPEC_MODE: %d\n",
-			__func__, ret);
-		return ret;
-	}
-
-	dev_dbg(component->dev, "%s: USB change event received\n",
-		__func__);
-	dev_dbg(component->dev, "%s: supply mode %d, expected %d\n", __func__,
-		mode.intval, POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER);
-
-	switch (mode.intval) {
-	case POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER:
-	case POWER_SUPPLY_TYPEC_NONE:
-		dev_dbg(component->dev, "%s: usbc_mode: %d; mode.intval: %d\n",
-			__func__, mbhc->usbc_mode, mode.intval);
-
-		if (mbhc->usbc_mode == mode.intval)
-			break; /* filter notifications received before */
-		mbhc->usbc_mode = mode.intval;
-
-		dev_dbg(component->dev, "%s: queueing usbc_analog_work\n",
-			__func__);
-		schedule_work(&mbhc->usbc_analog_work);
-		break;
-	default:
-		break;
-	}
-	return ret;
-}
-
 /* PMI registration code */
 static int wcd_mbhc_usb_c_analog_init(struct wcd_mbhc *mbhc)
 {
@@ -1907,55 +1843,12 @@ static int wcd_mbhc_init_gpio(struct wcd_mbhc *mbhc,
 	return rc;
 }
 
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-static int wcd_mbhc_non_usb_c_event_changed(struct notifier_block *nb,
-					unsigned long evt, void *ptr)
-{
-	int ret;
-	union power_supply_propval mode;
-	struct wcd_mbhc *mbhc = container_of(nb, struct wcd_mbhc, fsa_nb);
-
-	ret = power_supply_get_property(ptr,
-			POWER_SUPPLY_PROP_TYPEC_MODE, &mode);
-
-	switch (mode.intval) {
-	case POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER:
-		dev_err(mbhc->component->dev, "%s: report Type-C usb headphone\n", __func__);
-		if (mbhc->usbc_mode == mode.intval)
-			break; /* filter notifications received before */
-		wcd_mbhc_jack_report(mbhc, &mbhc->usb_3_5_jack,
-					(SND_JACK_HEADSET | SND_JACK_UNSUPPORTED),
-					WCD_MBHC_JACK_USB_3_5_MASK);
-		mbhc->usbc_mode = mode.intval;
-		break;
-	case POWER_SUPPLY_TYPEC_NONE:
-		if (mbhc->usbc_mode == mode.intval)
-			break; /* filter notifications received before */
-		if (mbhc->usbc_mode == POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER) {
-			mbhc->usbc_mode = mode.intval - 1;
-			break;
-		}
-		wcd_mbhc_jack_report(mbhc, &mbhc->usb_3_5_jack, 0,
-					WCD_MBHC_JACK_USB_3_5_MASK);
-		mbhc->usbc_mode = mode.intval;
-		break;
-	default:
-		break;
-	}
-
-	return ret;
-}
-#endif
-
 int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 {
 	int rc = 0;
 	struct snd_soc_component *component;
 	struct snd_soc_card *card;
 	const char *usb_c_dt = "qcom,msm-mbhc-usbc-audio-supported";
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-	const char *fsa4476_dt = "qcom,fsa4476-gpio-support";
-#endif
 
 	if (!mbhc || !mbhc_cfg)
 		return -EINVAL;
@@ -1987,7 +1880,6 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 		dev_dbg(mbhc->component->dev, "%s: usbc analog enabled\n",
 				__func__);
 		mbhc->swap_thr = GND_MIC_USBC_SWAP_THRESHOLD;
-#ifndef CONFIG_MACH_XIAOMI_SM8150
 		mbhc->fsa_np = of_parse_phandle(card->dev->of_node,
 				"fsa4480-i2c-handle", 0);
 		if (!mbhc->fsa_np) {
@@ -1998,27 +1890,12 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 			mbhc_cfg->usbc_analog_legacy = true;
 			/* goto err; */
 		}
-#endif
 	}
 
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		mbhc_cfg->use_fsa4476_gpio = 0;
-		if (of_find_property(card->dev->of_node, fsa4476_dt, NULL)) {
-			rc = of_property_read_u32(card->dev->of_node, fsa4476_dt,
-					&mbhc_cfg->use_fsa4476_gpio);
-			if (rc != 0) {
-				dev_dbg(card->dev,
-					"%s: %s in dt node is missing or false\n",
-					__func__, fsa4476_dt);
-			}
-		}
-
-	if (mbhc_cfg->use_fsa4476_gpio != 0) {
-#else
 	if (mbhc_cfg->enable_usbc_analog && mbhc_cfg->usbc_analog_legacy) {
 		struct usbc_ana_audio_config *config =
 						&mbhc_cfg->usbc_analog_cfg;
-#endif
+
 		rc = wcd_mbhc_init_gpio(mbhc, mbhc_cfg,
 				"qcom,usbc-analog-en1-gpio",
 				&config->usbc_en1_gpio,
@@ -2026,7 +1903,6 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 		if (rc)
 			goto err;
 
-#ifndef CONFIG_MACH_XIAOMI_SM8150
 		if (of_find_property(card->dev->of_node,
 				     "qcom,usbc-analog-force_detect_gpio",
 				     NULL)) {
@@ -2037,7 +1913,6 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 			if (rc)
 				goto err;
 		}
-#endif
 
 		dev_dbg(component->dev, "%s: calling usb_c_analog_init\n",
 			__func__);
@@ -2047,17 +1922,6 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 			rc = -EPROBE_DEFER;
 			goto err;
 		}
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		} else {
-			mbhc->fsa_np = of_parse_phandle(card->dev->of_node,
-					"fsa4480-i2c-handle", 0);
-			if (!mbhc->fsa_np) {
-				dev_err(card->dev, "%s: fsa4480 i2c node not found\n",
-					__func__);
-				rc = -EINVAL;
-				goto err;
-			} // git
-#endif
 	}
 
 	/* Set btn key code */
@@ -2082,63 +1946,14 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 				 __func__, mbhc->mbhc_fw, mbhc->mbhc_cal);
 	}
 
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-	if (mbhc_cfg->enable_usbc_analog) {
-		if (mbhc_cfg->use_fsa4476_gpio == 0) {
-#else
 	if (mbhc_cfg->enable_usbc_analog && !mbhc_cfg->usbc_analog_legacy) {
-#endif
 		mbhc->fsa_nb.notifier_call = wcd_mbhc_usbc_ana_event_handler;
 		mbhc->fsa_nb.priority = 0;
 		rc = fsa4480_reg_notifier(&mbhc->fsa_nb, mbhc->fsa_np);
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		} else {
-			mbhc->psy_nb.notifier_call = wcd_mbhc_usb_c_event_changed;
-			mbhc->psy_nb.priority = 0;
-			rc = power_supply_reg_notifier(&mbhc->psy_nb);
-			if (rc) {
-				dev_err(codec->dev, "%s: power supply registration failed\n",
-					__func__);
-				goto err;
-			}
-
-			/*
-			 * as part of the init sequence check if there is a connected
-			 * USB C analog adapter
-			 */
-			dev_dbg(mbhc->codec->dev, "%s: verify if USB adapter is already inserted\n",
-				__func__);
-			rc = wcd_mbhc_usb_c_event_changed(&mbhc->psy_nb,
-							   PSY_EVENT_PROP_CHANGED,
-							   mbhc->usb_psy);
-		} // git
-	}  else {
-		mbhc->fsa_nb.notifier_call = wcd_mbhc_non_usb_c_event_changed;
-		mbhc->fsa_nb.priority = 0;
-		rc = power_supply_reg_notifier(&mbhc->fsa_nb);
-		if (rc) {
-			dev_err(card->dev, "%s: power supply registration failed\n",
-					__func__);
-			goto err;
-		} // git
-#endif
-#ifndef CONFIG_MACH_XIAOMI_SM8150
 	}
-#endif
+
 	return rc;
 err:
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-	if (config->usbc_en1_gpio > 0) {
-		dev_dbg(card->dev, "%s free usb en1 gpio %d\n",
-			__func__, config->usbc_en1_gpio);
-		gpio_free(config->usbc_en1_gpio);
-		config->usbc_en1_gpio = 0;
-	}
-	if (config->usbc_en1_gpio_p)
-		of_node_put(config->usbc_en1_gpio_p);
-	if (config->usbc_force_gpio_p)
-		of_node_put(config->usbc_force_gpio_p);
-#endif
 	dev_dbg(mbhc->component->dev, "%s: leave %d\n", __func__, rc);
 	return rc;
 }
@@ -2171,13 +1986,9 @@ void wcd_mbhc_stop(struct wcd_mbhc *mbhc)
 	}
 
 	if (mbhc->mbhc_cfg->enable_usbc_analog) {
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		if (mbhc->mbhc_cfg->use_fsa4476_gpio == 0) {
-#else
 		if (mbhc->mbhc_cfg->usbc_analog_legacy) {
 			struct usbc_ana_audio_config *config =
 					&mbhc->mbhc_cfg->usbc_analog_cfg;
-#endif
 
 			wcd_mbhc_usb_c_analog_deinit(mbhc);
 			/* free GPIOs */
@@ -2188,20 +1999,10 @@ void wcd_mbhc_stop(struct wcd_mbhc *mbhc)
 
 			if (config->usbc_en1_gpio_p)
 				of_node_put(config->usbc_en1_gpio_p);
-#ifndef CONFIG_MACH_XIAOMI_SM8150
 			if (config->usbc_force_gpio_p)
 				of_node_put(config->usbc_force_gpio_p);
-#endif
 		} else {
 			fsa4480_unreg_notifier(&mbhc->fsa_nb, mbhc->fsa_np);
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-		}
-#endif
-#ifdef CONFIG_MACH_XIAOMI_SM8150
-	} else {
-		if (mbhc->fsa_nb.notifier_call != NULL)
-			power_supply_unreg_notifier(&mbhc->fsa_nb);
-#endif
 		}
 	}
 
@@ -2342,7 +2143,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 		}
 
 #ifdef CONFIG_MACH_XIAOMI_SM8150
-		ret = snd_soc_card_jack_new(codec->component.card,
+		ret = snd_soc_card_jack_new(component->card,
 					    "USB_3_5 Jack", WCD_MBHC_JACK_USB_3_5_MASK,
 					    &mbhc->usb_3_5_jack, NULL, 0);
 		if (ret) {

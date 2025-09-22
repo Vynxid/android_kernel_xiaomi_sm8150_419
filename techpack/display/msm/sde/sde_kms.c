@@ -1045,7 +1045,11 @@ static void sde_kms_commit(struct msm_kms *kms,
 			sde_crtc_commit_kickoff(crtc, old_crtc_state);
 		}
 	}
-
+/*
+	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
+		sde_crtc_fod_ui_ready(crtc, old_crtc_state);
+	}
+*/
 	SDE_ATRACE_END("sde_kms_commit");
 }
 
@@ -1194,11 +1198,15 @@ static void sde_kms_complete_commit(struct msm_kms *kms,
 
 		sde_connector_complete_qsync_commit(connector, &params);
 
+		SDE_ATRACE_BEGIN("post_kickoff");
 		rc = c_conn->ops.post_kickoff(connector, &params);
+		SDE_ATRACE_END("post_kickoff");
+
 		if (rc) {
 			pr_err("Connector Post kickoff failed rc=%d\n",
 					 rc);
 		}
+		sde_connector_fod_notify(connector);
 	}
 
 	_sde_kms_drm_check_dpms(old_state, DRM_PANEL_EVENT_BLANK);

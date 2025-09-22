@@ -359,6 +359,7 @@ struct sde_crtc {
 
 	/* blob for histogram data */
 	struct drm_property_blob *hist_blob;
+	bool is_primary_sde_crtc;
 	enum frame_trigger_mode_type frame_trigger_mode;
 
 	u32 cp_pu_feature_mask;
@@ -436,7 +437,10 @@ struct sde_crtc_state {
 	bool ds_dirty;
 	struct sde_hw_ds_cfg ds_cfg[SDE_MAX_DS_COUNT];
 	struct sde_hw_scaler3_lut_cfg scl3_lut_cfg;
-
+	
+	bool finger_down;
+	bool dim_layer_status;
+	struct sde_hw_dim_layer *fingerprint_dim_layer;
 	struct sde_core_perf_params new_perf;
 	int secure_session;
 };
@@ -601,6 +605,14 @@ void sde_crtc_prepare_commit(struct drm_crtc *crtc,
  */
 void sde_crtc_complete_commit(struct drm_crtc *crtc,
 		struct drm_crtc_state *old_state);
+
+/**
+ * sde_crtc_fod_ui_ready - callback to notify fod ui ready message
+ * @crtc: Pointer to drm crtc object
+ * @old_state: Pointer to drm crtc old state object
+ */
+//void sde_crtc_fod_ui_ready(struct drm_crtc *crtc,
+//		struct drm_crtc_state *old_state);
 
 /**
  * sde_crtc_init - create a new crtc object
@@ -868,6 +880,7 @@ void sde_crtc_get_misr_info(struct drm_crtc *crtc,
  */
 int sde_crtc_get_num_datapath(struct drm_crtc *crtc,
 		struct drm_connector *connector);
+uint32_t sde_crtc_get_mi_fod_sync_info(struct sde_crtc_state *cstate);
 
 /**
  * _sde_crtc_clear_dim_layers_v1 - clear all dim layer settings

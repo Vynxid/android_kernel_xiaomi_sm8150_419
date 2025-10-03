@@ -617,6 +617,9 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 		goto wait_err;
 	}
 
+#if defined(CONFIG_MACH_XIAOMI_VAYU)
+	cdev = dev->cdev;
+#endif
 	len = ALIGN(count, dev->ep_out->maxpacket);
 	if (len > mtp_rx_req_len)
 		return -EINVAL;

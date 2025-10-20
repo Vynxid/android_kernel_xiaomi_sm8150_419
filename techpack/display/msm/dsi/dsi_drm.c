@@ -212,16 +212,16 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 	int rc = 0;
 	struct dsi_bridge *c_bridge = to_dsi_bridge(bridge);
 	struct drm_device *dev = bridge->dev;
-	int event = 0;
+	struct drm_notify_data g_notify_data;
+	int power_mode = 0;
 
 	if (dev->doze_state == DRM_BLANK_POWERDOWN) {
 		dev->doze_state = DRM_BLANK_UNBLANK;
 		pr_info("%s power on from power off\n", __func__);
 	}
 
-	event = dev->doze_state;
-
-	g_notify_data.data = &event;
+	power_mode = dev->doze_state;
+	g_notify_data.data = &power_mode;
 
 	if (!bridge) {
 		DSI_ERR("Invalid params\n");
@@ -241,7 +241,7 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 		__pm_relax(prim_panel_wakelock);
 		if (dev->fp_quickon &&
 			(dev->doze_state == DRM_BLANK_LP1 || dev->doze_state == DRM_BLANK_LP2)) {
-			event = DRM_BLANK_POWERDOWN;
+			power_mode = DRM_BLANK_POWERDOWN;
 			drm_notifier_call_chain(DRM_EARLY_EVENT_BLANK, &g_notify_data);
 			drm_notifier_call_chain(DRM_EVENT_BLANK, &g_notify_data);
 			dev->fp_quickon = false;
@@ -504,16 +504,18 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 	int rc = 0;
 	struct dsi_bridge *c_bridge = to_dsi_bridge(bridge);
 	struct drm_device *dev = bridge->dev;
-	int event = 0;
+	struct drm_notify_data g_notify_data;
+	int power_mode = 0;
 
 	if (dev->doze_state == DRM_BLANK_UNBLANK) {
 		dev->doze_state = DRM_BLANK_POWERDOWN;
 		pr_info("%s wrong doze state\n", __func__);
 	}
 
-	event = dev->doze_state;
-
-	g_notify_data.data = &event;
+	power_mode = dev->doze_state;
+	g_notify_data.data = &power_mode;
+	g_notify_data.id = MSM_DRM_PRIMARY_DISPLAY;
+	drm_notifier_call_chain(DRM_EARLY_EVENT_BLANK, &g_notify_data);
 
 	if (!bridge) {
 		DSI_ERR("Invalid params\n");
@@ -527,13 +529,11 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 
 	if (dev->doze_state == DRM_BLANK_LP1 || dev->doze_state == DRM_BLANK_LP2) {
 		pr_err("%s doze state can't power off panel\n", __func__);
-		event = DRM_BLANK_POWERDOWN;
+		power_mode = DRM_BLANK_POWERDOWN;
 		drm_notifier_call_chain(DRM_EARLY_EVENT_BLANK, &g_notify_data);
 		drm_notifier_call_chain(DRM_EVENT_BLANK, &g_notify_data);
 		return;
 	}
-
-	drm_notifier_call_chain(DRM_EARLY_EVENT_BLANK, &g_notify_data);
 
 	SDE_ATRACE_BEGIN("dsi_bridge_post_disable");
 	SDE_ATRACE_BEGIN("dsi_display_disable");

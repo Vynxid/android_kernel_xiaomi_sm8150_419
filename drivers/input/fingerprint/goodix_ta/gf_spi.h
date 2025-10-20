@@ -137,10 +137,7 @@ struct gf_dev {
 #ifdef GF_FASYNC
 	struct fasync_struct *async;
 #endif
-	struct notifier_block notifier;
 	char device_available;
-	char fb_black;
-	char wait_finger_down;
 	struct regulator *vreg;
 };
 
